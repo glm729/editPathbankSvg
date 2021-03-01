@@ -1,5 +1,3 @@
-// Main operative cell
-
 /** -- Operations -- **/
 
 // Get the data, and if it exists, resurrect
@@ -12,8 +10,28 @@ if (data && get("svgUpload")) doThings();
 
 /** -- Function definitions -- **/
 
+// Function to check whether two nodes are at least partially overlapping
+function overlapping(node0, node1) {
+  function inRangeX(value) {
+    let x = {min: boundsRef.left, max: boundsRef.right};
+    if (value >= x.min && value <= x.max) return true;
+    return false;
+  };
+  function inRangeY(value) {
+    let y = {min: boundsRef.top, max: boundsRef.bottom};
+    if (value >= y.min && value <= y.max) return true;
+    return false;
+  };
+  let boundsRef = node0.getBoundingClientRect();
+  let boundsCheck = node1.getBoundingClientRect();
+  let h = (inRangeX(boundsCheck.left) || inRangeX(boundsCheck.right));
+  let v = (inRangeY(boundsCheck.top) || inRangeY(boundsCheck.bottom));
+  if (h && v) return true;
+  return false;
+};
+
 // Callback version of forEach operations, for a bit of easier editing/tracing
-function doThingsDataCallback(data, svg, nodes) {
+function doThingsDataCallback(data, svg, nodes, paths) {
   // Get the relevant ID for the radial gradient
   let urlId = `rg_${data.name.replace(/\W/g, "_")}`;
   // Test to see if the definition exists -- if so, remove it
@@ -28,6 +46,19 @@ function doThingsDataCallback(data, svg, nodes) {
     .flat();
   // For each group element
   groups.forEach(group => {
+    // Jeg drikker mange, takk
+    let ol = paths.filter(p => overlapping(group, p));
+    // For each overlapping element
+    ol.forEach(o => {
+      // Get the paths and polygons
+      let pathSub = getElementsByXpath(`./s:path[@data-colored="true"]`, o);
+      let poly = getElementsByXpath(`./s:polygon`, o);
+      // For each path
+      pathSub.forEach(p => {
+        // Set the stroke width to scale by effect strength
+        p.setAttribute("stroke-width", 3 * (1 + +data.strength));
+      });
+    });
     // Get the circles within
     let circles = getElementsByXpath(`./s:circle`, group);
     // Apply the radial gradient
@@ -39,7 +70,8 @@ function doThingsDataCallback(data, svg, nodes) {
 function doThings() {
   let svg = getElementByXpath(`//div[@id="svgInput"]/s:svg`);
   let nodes = allText();
-  data.forEach(d => doThingsDataCallback(d, svg, nodes));
+  let paths = getElementsByXpath(`//s:path[@data-colored="true"]/..`);
+  data.forEach(d => doThingsDataCallback(d, svg, nodes, paths));
 };
 
 // Helper function to make a generic set of stops for a radial gradient
